@@ -42,7 +42,9 @@ pip install -r requirements.txt
 🚀 Usage
 1.Clone or download this repository
 
+
 2.Open sfd_bmd_visualizer.py in your IDE (e.g., VS Code)
+
 
 3.Scroll to the bottom and define your beam:
 
@@ -51,9 +53,11 @@ pip install -r requirements.txt
   beam.add_point_load(pos=4, magnitude=-10)
   
   beam.add_udl(start=6, end=10, intensity=-2)   
+  
 
 4.Run the script:
   python sfd_bmd_visualizer.py
+  
   
 5.You'll see the plot and find the image saved at:
   beam_outputs/beam_1_example.png
