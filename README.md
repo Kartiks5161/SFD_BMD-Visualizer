@@ -14,7 +14,7 @@ It allows you to:
 ## 📸 Example Output
 
 <p align="center">
-  <img src="SFD_BMD Visualizer\Beam A.png" alt="Example Plot" width="700">
+  <img src="Beam A.png" alt="Example Plot" width="700">
 </p>
 
 ---
