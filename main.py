@@ -1,148 +1,208 @@
 import os
-import numpy as np #numpy or Numerical Python is an inbuilt python library which has function to solve high level scientific problems
-import matplotlib.pyplot as plt #matplotlib is a library which provides matlab like interface and function in python itself
+import tkinter as tk
+from tkinter import messagebox
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
+import matplotlib.pyplot as plt
 
-# We will create a Class , which will help us assign different data plots for different beams
-
-class Beam:
-    
-    def __init__(self, length,name="default_beam"): #this automatically creates the intital requirements of the beams
-        
+class Beam: 
+    def __init__(self,length,name="default_beam"):#default function , creating the arrrays of point loads and UDLs , also creating the edge vertical forces
         self.name=name
-        self.length=length #assigning the given beam length to it
-        self.point_loads=[] #array for loads which are in the range(0,L) as [(pos,magnitude)]
-        self.udls=[] #array for the uniformly distributed loads as [(start,end,intensity)]
-        self.L=0 #Left suppport Reaction
-        self.R=0 #Right suppport Reaction
+        self.length=length
+        self.point_loads=[]
+        self.udls=[]
+        self.L=0
+        self.R=0
 
-    def add_point_load(self,pos,magnitude): #adds the point loads in the array point_loads
-        self.point_loads.append((pos,magnitude))
+    def add_point_load(self, pos, magnitude):#simply appends the user given point loads to the array
+        self.point_loads.append((pos, magnitude))
 
-    def add_udl(self, start,end,intensity): #adds the UDL in the array udls
-        self.udls.append((start,end,intensity))
+    def add_udl(self, start, end, intensity):#same for this
+        self.udls.append((start, end, intensity))
 
-
-    # Now we need to compute the SFD and BMD
-
-    #this computes the initial values we require to calcualte the SFD and BMD   OR calculation of support reactions
-    def compute_reactions(self):    
-
+    def compute_reactions(self):#NOW we need to compute hte support reactions at the edges
         total_load = 0
         moment_about_A = 0
 
-        for pos,mag in self.point_loads:# as the loads in range(0,L) in point_loads are in pairs we are using two iterables pos , mag
-            total_load+=mag #caluclating the total load 
-            moment_about_A+=(mag*pos) #calculating the total moment about A
+        for pos, mag in self.point_loads:
+            total_load += mag
+            moment_about_A += mag * pos
 
-        for start,end,intensity in self.udls:
-            length=end-start #total length of the UDL
-            total_load+=(intensity*length) #total intensity over the given length
-            center=(start+length) / 2 #calculates the point at which the total load will be applied
-            moment_about_A+=(intensity*length*center) #calcualtes the impact of the UDL on the point A
+        for start, end, intensity in self.udls:
+            length = end - start
+            total_load += intensity * length
+            center = (start + end) / 2  
+            moment_about_A += intensity * length * center
 
-        self.R=(moment_about_A/self.length) # force on right point as Moment=Force*Length
-        self.L=total_load-self.R #compatibilty is used
+        self.R = moment_about_A / self.length
+        self.L = total_load - self.R
 
-
-    #Function to calculate the SF at a given point x
-    def shear_force_at(self, x):
+    def shear_force_at(self,x):#calcualting shear force at any point x, at 0 pos the shear force is equal to the support raction but as we move forward the support reaction reduces if the point load faces downwards 
         V=self.L
-
-        for pos,mag in self.point_loads:
-            if x>=pos: #if x is on the right of the load , the load will have an impact on x
-                V+=mag
-
-        for start,end,intensity in self.udls:
-            if x>=start: #checks if load is on the right of x or left
-                if x<=end:
-                    V+= intensity*(x-start) #as x is situated in between start and end of the UDL only partial UDL will be accounted for
-                else:
-                    V+= intensity*(end-start) #total UDL will be added
-
-        return V #returns the shear force at the point x
-
-
-    #Now we need to calculate the BM at any point x
-    def bending_moment_at(self, x):
-        M = (self.L)*x # Calculates the total BM if no other force was present between x and 0(Left point of beam)
-
         for pos,mag in self.point_loads:
             if x>=pos:
-                M += mag*(x-pos) # as we are calculating the BM at point x , we know that we have clockwise as positive so we only need to consider the distance between the point x and pos
-
+                V-= mag  
         for start,end,intensity in self.udls:
             if x>=start:
                 if x<=end:
-                    a= x-start
-                    M+= (intensity*a )* (a/2) #(intensity * a ) calcualtes the total force which is currently imapcting point x, (a/2) is the point at which the said total force is applied so the distance of point x and the total force is also (a/2)
+                    V-= intensity * (x-start)  
                 else:
-                    length = end-start
-                    M+= (intensity*length)* ((x-((start+length)/2)))
+                    V-= intensity * (end-start) 
+        return V
+
+    def bending_moment_at(self, x):
+        M=self.L * x
+
+        for pos,mag in self.point_loads:
+            if x>=pos:
+                M-= mag * (x-pos) 
+
+        for start, end, intensity in self.udls:
+            if x>=start:
+                if x<=end:
+                    a=x-start
+                    M-= (intensity * (a ** 2))/2 
+                else:
+                    length=end-start
+                    centroid=(start + end)/2
+                    M-= intensity * length * (x-centroid) 
 
         return M
- 
-    # Now we need to plot the values using the function formuales we made earlier
+
     def plot_SFD_BMD(self):
-        self.compute_reactions()#executing the function to calcualte the required support reactions
+        self.compute_reactions()
 
-        x_vals = np.linspace(0, self.length, 500) #using linspace to create 500 points between (0,L)
-        shear_vals = [self.shear_force_at(x) for x in x_vals]#using the shear force function to calcualte SF at x at all 500 points
-        moment_vals = [self.bending_moment_at(x) for x in x_vals]#same for BM
+        x_vals=np.linspace(0,self.length,500)
+        shear_vals=[self.shear_force_at(x) for x in x_vals]
+        moment_vals=[self.bending_moment_at(x) for x in x_vals]
 
-        plt.figure(figsize=(12,6)) #created a figure of size 12,6
+        plt.figure(figsize=(12,6))
 
-        # Shear Force Diagram
-        plt.subplot(2,1,1) #now creating a subplot in the 1st row
-        plt.plot(x_vals,shear_vals,  color='blue',label='SF')
-
-        plt.axhline(0,color='black',linewidth=0.8)#a horizontal line representing the beam 
-
-        plt.title('Shear Force Diagram') #title of the subplot
-        plt.ylabel('Shear Force (kN)')#y axis
-        plt.grid(True)#grids are on
-        plt.legend()#shows which line is what
-
-        # Bending Moment Diagram
-        plt.subplot(2,1,2)
-        plt.plot(x_vals,moment_vals,  color='red',label='BM')
-
+        plt.subplot(2,1,1)
+        plt.plot(x_vals,shear_vals,color='blue',label='SF')
         plt.axhline(0,color='black',linewidth=0.8)
+        plt.title('Shear Force Diagram')
+        plt.ylabel('Shear Force (kN)')
+        plt.grid(True)
+        plt.legend()
 
+        plt.subplot(2,1,2)
+        plt.plot(x_vals,moment_vals,color='red',label='BM')
+        plt.axhline(0,color='black',linewidth=0.8)
         plt.title('Bending Moment Diagram')
         plt.xlabel('Beam Length (m)')
         plt.ylabel('Bending Moment (kNm)')
         plt.grid(True)
         plt.legend()
 
-        plt.tight_layout()#lets make sure nothing overlaps
+        plt.tight_layout()
 
-        #To create a folder for the image
         output_folder="Beam_Outputs"
         os.makedirs(output_folder, exist_ok=True)
-
-        filename = f"{self.name}.png"
-        filepath = os.path.join(output_folder, filename)
+        filename=f"{self.name}.png"
+        filepath=os.path.join(output_folder, filename)
         plt.savefig(filepath, dpi=300)
 
-        plt.show()#shows the subplot
-       
+        plt.show()
 
 
-# EDIT THE VALUES IN HERE PLEASE
-#-ve value for downwards force and +ve for upwards
+class Beam_GUI:
+    def __init__(self, root):
+        self.root=root
+        self.root.title("Beam SFD & BMD")
+        self.point_loads=[]
+        self.udls=[]
 
-if __name__ == "__main__":#makes sure that the function does not run twice if we are accessing it from any other folder
-    
-    # beamA = Beam(length= )
-    # beamA.add_point_load(pos= ,magnitude= )#enter the required values       
-    # beamA.add_udl(start= ,end= ,intensity= )     
-    # beamA.plot_SFD_BMD()
-    
-    beam = Beam(length=15,name="Beam A")
-    beam.add_point_load(pos=5, magnitude=-10)
-    beam.add_point_load(pos=12, magnitude=-6)
-    beam.add_udl(start=7, end=14, intensity=-2)
-    beam.plot_SFD_BMD()
+        #creating the labels and entries 
+
+        tk.Label(root,text="Beam Length:").grid(row=0,column=0)
+        self.length_entry=tk.Entry(root)
+        self.length_entry.grid(row=0,column=1)
+
+        tk.Label(root,text="Point Load (pos,mag):").grid(row=1,column=0)
+        self.point_loads_entry=tk.Entry(root)
+        self.point_loads_entry.grid(row=1,column=1)
+
+        tk.Label(root, text="UDL (start,end,intensity):").grid(row=2, column=0)
+        self.UDL_entry=tk.Entry(root)
+        self.UDL_entry.grid(row=2,column=1)
+
+        #creating the buttons and assigning them commands
+
+        tk.Button(root,text="CLEAR", command=self.clear_entries).grid(row=0,column=2)
+        tk.Button(root,text="Add Point Load", command=self.add_point_load).grid(row=1,column=2)
+        tk.Button(root,text="Add UDL", command=self.add_udl).grid(row=2,column=2)
+        tk.Button(root,text="Plot Beam", command=self.plot_beam).grid(row=3,column=1)
+
+        #creating a log sheet , just to know which forces have been added
+
+        self.log=tk.Text(root,height=8,width=50)
+        self.log.grid(row=4,column=0,columnspan=3)
 
 
- 
+    def add_point_load(self):
+
+        try:
+
+            pos,mag =map(float,self.point_loads_entry.get().split(','))
+            self.point_loads.append((pos,mag))
+            self.log.insert(tk.END,f"Added Point Load: {mag} kN at {pos} m\n")
+
+        except:
+
+            messagebox.showerror("Error","Enter point load as: pos, magnitude")
+
+    def add_udl(self):
+
+        try:
+
+            start,end,intensity = map(float,self.UDL_entry.get().split(','))
+            self.udls.append((start,end,intensity))
+            self.log.insert(tk.END,f"Added UDL: {intensity} kN/m from {start} to {end} m\n")
+
+        except:
+
+            messagebox.showerror("Error", "Enter UDL as: start, end, intensity")
+
+    def plot_beam(self):
+
+        try:
+
+            length = float(self.length_entry.get())
+            beam = Beam(length=length, name="GUI_Beam")
+
+            for pos, mag in self.point_loads:
+
+                beam.add_point_load(pos,mag)
+
+            for start, end, intensity in self.udls:
+
+                beam.add_udl(start, end, intensity)
+
+
+            beam.plot_SFD_BMD()
+
+
+        except:
+            messagebox.showerror("Error", "Please enter a valid beam length")
+
+    def clear_entries(self):
+        #clearing the entries
+        self.length_entry.delete(0,tk.END)
+        self.point_loads_entry.delete(0,tk.END)
+        self.UDL_entry.delete(0, tk.END)
+
+        #clearing the logs
+        self.log.delete('1.0',tk.END)
+
+        #clearing the arrays
+        self.point_loads.clear()
+        self.udls.clear()
+
+
+
+if __name__ == "__main__":
+
+    root = tk.Tk()
+    gui = Beam_GUI(root)
+    root.mainloop()
